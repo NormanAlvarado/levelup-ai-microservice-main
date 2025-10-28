@@ -46,15 +46,21 @@ export class GeminiProvider {
 FORMATO REQUERIDO (copiar estructura exacta):
 {
   "name": "Nombre del plan de entrenamiento",
-  "description": "Descripción detallada del plan",
-  "exercises": [
+  "description": "Descripción breve del plan",
+  "days": [
     {
-      "name": "Nombre del ejercicio",
-      "sets": 3,
-      "reps": "8-12",
-      "restTime": "60-90 seg",
-      "instructions": "Instrucciones claras para ejecutar el ejercicio",
-      "targetMuscles": ["músculo1", "músculo2"]
+      "dayNumber": 1,
+      "dayName": "Día 1 - Tren Superior",
+      "exercises": [
+        {
+          "name": "Nombre del ejercicio",
+          "sets": 3,
+          "reps": "8-12",
+          "restTime": "60-90 seg",
+          "instructions": "Instrucciones breves",
+          "targetMuscles": ["músculo1", "músculo2"]
+        }
+      ]
     }
   ]
 }
@@ -66,17 +72,17 @@ IMPORTANTE:
 - Responde ÚNICAMENTE con el JSON válido
 - NO agregues texto antes o después del JSON
 - NO uses markdown, backticks ni formato de código
-- Asegúrate que sea JSON válido y completo
-- Incluye entre 4-8 ejercicios apropiados
-- Los valores numéricos deben ser números, no strings
-- Las instrucciones deben ser claras y seguras`
+- Asegúrate que sea JSON válido y COMPLETO (cierra todos los arrays y objetos)
+- Cada día debe tener 4-6 ejercicios máximo
+- Las instrucciones deben ser breves (máximo 2 líneas)
+- Cierra TODOS los objetos y arrays correctamente`
                   }
                 ]
               }
             ],
             generationConfig: {
               temperature: 0.7,
-              maxOutputTokens: 2000,
+              maxOutputTokens: 4096,
             }
           },
           {
@@ -181,8 +187,11 @@ IMPORTANTE:
           }
         }
         
-        // Validar estructura requerida
-        if (!workoutData.name || !workoutData.description || !Array.isArray(workoutData.exercises)) {
+        // Validar estructura requerida - soportar ambos formatos (legacy y nuevo)
+        const hasLegacyFormat = workoutData.exercises && Array.isArray(workoutData.exercises);
+        const hasNewFormat = workoutData.days && Array.isArray(workoutData.days);
+        
+        if (!workoutData.name || !workoutData.description || (!hasLegacyFormat && !hasNewFormat)) {
           throw new BadRequestException('El plan de entrenamiento generado no contiene los campos requeridos');
         }
 

@@ -11,18 +11,11 @@ export interface Exercise {
   equipment?: string;
 }
 
-export interface WorkoutPlan {
-  id?: string;
-  userId: string;
-  name: string;
-  description?: string;
-  difficulty: WorkoutDifficulty;
-  goal: WorkoutGoal;
-  daysPerWeek: number;
-  estimatedDuration: number;
+export interface WorkoutDay {
+  dayNumber: number;
+  dayName: string;
   exercises: Exercise[];
-  createdAt?: Date;
-  updatedAt?: Date;
+  focusArea?: string;
 }
 
 export enum WorkoutGoal {
@@ -41,8 +34,17 @@ export enum WorkoutDifficulty {
   EXPERT = 'expert',
 }
 
-export interface WorkoutDay {
-  dayName: string;
-  exercises: Exercise[];
-  focusArea?: string;
+export interface WorkoutPlan {
+  id?: string;
+  userId: string;
+  name: string;
+  description?: string;
+  difficulty: WorkoutDifficulty;
+  goal: WorkoutGoal;
+  daysPerWeek: number;
+  estimatedDuration: number;
+  exercises?: Exercise[]; // For backward compatibility
+  days?: WorkoutDay[]; // New format: exercises organized by days
+  createdAt?: Date;
+  updatedAt?: Date;
 }
