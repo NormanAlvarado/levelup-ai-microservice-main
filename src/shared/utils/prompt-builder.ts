@@ -20,14 +20,20 @@ Usa la siguiente estructura **estrictamente**:
 {
   "name": "Nombre del plan de entrenamiento",
   "description": "Descripción detallada del plan",
-  "exercises": [
+  "days": [
     {
-      "name": "Nombre del ejercicio",
-      "sets": 3,
-      "reps": "8-12",
-      "restTime": "60-90 seg",
-      "instructions": "Instrucciones claras para ejecutar el ejercicio",
-      "targetMuscles": ["músculo1", "músculo2"]
+      "dayNumber": 1,
+      "dayName": "Día 1 - Tren Superior",
+      "exercises": [
+        {
+          "name": "Nombre del ejercicio",
+          "sets": 3,
+          "reps": "8-12",
+          "restTime": "60-90 seg",
+          "instructions": "Instrucciones claras para ejecutar el ejercicio",
+          "targetMuscles": ["músculo1", "músculo2"]
+        }
+      ]
     }
   ]
 }
@@ -70,10 +76,13 @@ Usa la siguiente estructura **estrictamente**:
 - No incluyas explicaciones, comentarios, ni texto adicional.
 - No uses backticks, markdown ni formato de código.
 - El plan debe ser realista y seguro para el nivel ${dto.difficulty}.
-- Incluye entre 4-8 ejercicios apropiados para ${dto.duration} minutos.
+- Debes crear exactamente ${dto.daysPerWeek} días de entrenamiento en el array "days".
+- Cada día debe tener entre 4-7 ejercicios apropiados para ${dto.duration} minutos.
+- Distribuye los ejercicios para trabajar diferentes grupos musculares en diferentes días.
 - Los ejercicios deben ser variados y enfocados en ${dto.goal}.
 - Las repeticiones y series deben ser apropiadas para el nivel.
-- Los tiempos de descanso deben ser realistas.`;
+- Los tiempos de descanso deben ser realistas.
+- Ejemplo de distribución: Día 1: Tren Superior, Día 2: Tren Inferior, Día 3: Full Body, etc.`;
 
   return prompt;
 }

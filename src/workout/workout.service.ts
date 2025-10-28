@@ -124,19 +124,12 @@ export class WorkoutService {
       goal: dto.goal,
       daysPerWeek: dto.daysPerWeek,
       estimatedDuration: dto.duration,
-      exercises: aiResponse.exercises,
+      exercises: aiResponse.exercises,  // Legacy format (flat exercises)
+      days: aiResponse.days,             // NEW: Day-based format
     };
 
-    // Save to Supabase (temporarily disabled for testing)
-    // const savedWorkout = await this.supabaseService.saveWorkoutPlan(workoutPlan);
-    
-    // For now, return the workout plan directly
-    const savedWorkout = { 
-      ...workoutPlan, 
-      id: `temp-${Date.now()}`,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    } as WorkoutPlan;
+    // Save to Supabase
+    const savedWorkout = await this.supabaseService.saveWorkoutPlan(workoutPlan);
 
     this.logger.log(`Workout generated successfully for user: ${dto.userId}, ID: ${savedWorkout.id}`);
 
