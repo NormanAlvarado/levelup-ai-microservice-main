@@ -41,6 +41,7 @@ export class DietService {
   }
 
   async generatePersonalizedDiet(dto: GenerateDietDto): Promise<ApiResponse<DietPlan>> {
+    const startTime = Date.now();
     try {
       this.logger.log(`Generating personalized diet plan for user: ${dto.userId}`);
 
@@ -52,11 +53,17 @@ export class DietService {
       
       // Generate diet plan using selected AI provider with user profile
       let aiResponse;
+      let model: string;
+      
       if (provider === 'gemini') {
         aiResponse = await this.geminiProvider.generateDietPlan(dto, userProfile);
+        model = 'gemini-1.5-flash';
       } else {
         aiResponse = await this.openAiProvider.generateDietPlan(dto);
+        model = 'gpt-4o-mini';
       }
+
+      const latencyMs = Date.now() - startTime;
 
       // Calculate total macros from meals
       const totalMacros = this.calculateTotalMacros(aiResponse.meals);
@@ -76,10 +83,38 @@ export class DietService {
       // Save to Supabase
       const savedDiet = await this.supabaseService.saveDietPlan(dietPlan);
 
+      // Log AI generation
+      await this.supabaseService.saveAIGenerationLog({
+        userId: dto.userId,
+        requestType: 'diet',
+        provider: provider as 'openai' | 'gemini',
+        model,
+        requestData: dto,
+        responseData: { mealsCount: aiResponse.meals.length },
+        success: true,
+        latencyMs,
+        dietPlanId: savedDiet.id,
+      });
+
       this.logger.log(`Diet plan generated successfully for user: ${dto.userId}, ID: ${savedDiet.id}`);
 
       return createSuccessResponse(savedDiet, 'Diet plan generated successfully');
     } catch (error) {
+      const latencyMs = Date.now() - startTime;
+      
+      // Log error in AI generation
+      await this.supabaseService.saveAIGenerationLog({
+        userId: dto.userId,
+        requestType: 'diet',
+        provider: this.configService.get<string>('ai.defaultProvider') as 'openai' | 'gemini' || 'gemini',
+        model: 'unknown',
+        requestData: dto,
+        responseData: null,
+        success: false,
+        errorMessage: error.message,
+        latencyMs,
+      });
+
       this.logger.error('Error generating diet plan:', error);
       return createErrorResponse<DietPlan>(
         error.message,

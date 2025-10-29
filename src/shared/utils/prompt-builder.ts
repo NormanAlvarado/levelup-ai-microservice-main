@@ -88,12 +88,16 @@ Usa la siguiente estructura **estrictamente**:
 }
 
 export function buildDietPrompt(dto: GenerateDietDto, userProfile?: UserProfile): string {
-  let prompt = `Genera un plan nutricional personalizado con las siguientes especificaciones:
+  const mealsPerDay = dto.mealsPerDay || 4;
+  const totalMealsToGenerate = mealsPerDay * 7; // 7 días completos
+  
+  let prompt = `Genera un plan nutricional SEMANAL COMPLETO (7 DÍAS) con VARIEDAD en las comidas. Es fundamental que cada día tenga comidas DIFERENTES para asegurar una alimentación balanceada y evitar monotonía.
 
 📊 DATOS NUTRICIONALES:
 - Objetivo: ${dto.goal}
 - Calorías diarias: ${dto.calories}
-- Comidas por día: ${dto.mealsPerDay || 4}`;
+- Comidas por día: ${mealsPerDay}
+- **TOTAL DE COMIDAS A GENERAR: ${totalMealsToGenerate} comidas (${mealsPerDay} comidas × 7 días)**`;
 
   // Agregar información del perfil de usuario si está disponible
   if (userProfile) {
@@ -122,7 +126,7 @@ export function buildDietPrompt(dto: GenerateDietDto, userProfile?: UserProfile)
 
   if (dto.targetProtein) {
     prompt += `
-- Proteína objetivo: ${dto.targetProtein}g`;
+- Proteína objetivo: ${dto.targetProtein}g por día`;
   }
 
   if (dto.preferredFoods && dto.preferredFoods.length > 0) {
@@ -142,13 +146,30 @@ export function buildDietPrompt(dto: GenerateDietDto, userProfile?: UserProfile)
 
   prompt += `
 
+🍽️ REQUERIMIENTOS DE VARIEDAD (MUY IMPORTANTE):
+- Debes generar exactamente ${totalMealsToGenerate} comidas ÚNICAS (${mealsPerDay} por día × 7 días)
+- NUNCA repitas la misma proteína principal más de 2 veces por semana (ej: pollo, pescado, carne, huevos, tofu)
+- Varía los carbohidratos: arroz, quinoa, pasta, batata, avena, pan integral, etc.
+- Alterna las verduras y frutas cada día
+- Las comidas del Lunes deben ser DIFERENTES a las del Martes, Miércoles, etc.
+- Ejemplo de variedad en almuerzos:
+  * Lunes: Pechuga de pollo con arroz integral
+  * Martes: Salmón con quinoa
+  * Miércoles: Carne magra con batata
+  * Jueves: Tofu con fideos de arroz
+  * Viernes: Atún con pasta integral
+  * Sábado: Pavo con arroz salvaje
+  * Domingo: Pescado blanco con cuscús
+
 ⚠️ IMPORTANTE:
 - Responde **solo** con un objeto JSON válido
 - No incluyas explicaciones, comentarios, ni texto adicional
-- El plan debe ser balanceado y nutritivo
+- El plan debe tener ${totalMealsToGenerate} comidas TOTALES distribuidas en 7 días
+- Cada día debe mantener las ${dto.calories} calorías aproximadamente
 - Cumple estrictamente con las restricciones especificadas
 - Calcula correctamente las macros de cada comida
-- Asegúrate de que las cantidades sean realistas`;
+- Asegúrate de que las cantidades sean realistas
+- La VARIEDAD es CRÍTICA: no repitas comidas idénticas en la semana`;
 
   return prompt.trim();
 }
