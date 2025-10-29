@@ -8,6 +8,7 @@ import { DietModule } from './diet/diet.module';
 import { RecommendationModule } from './recommendation/recommendation.module';
 import { SupabaseModule } from './supabase/supabase.module';
 import { ExternalApisModule } from './external-apis/external-apis.module';
+import { FoodVisionModule } from './food-vision/food-vision.module';
 import configuration, { validationSchema } from './config/configuration';
 
 @Module({
@@ -27,6 +28,7 @@ import configuration, { validationSchema } from './config/configuration';
     RecommendationModule,
     SupabaseModule,
     ExternalApisModule,
+    FoodVisionModule,
   ],
   controllers: [AppController],
   providers: [AppService],
