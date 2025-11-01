@@ -7,32 +7,47 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // Global prefix for all routes
+  app.setGlobalPrefix('api/ai');
+
   // Enable CORS for LevelUp main project integration
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://localhost:4173',
+    'http://localhost:8080',
+    'https://level-up-ashy-sigma.vercel.app',
+  ];
+
   app.enableCors({
-    origin: [
-      'http://localhost:3000',  // React dev server default
-      'http://localhost:5173',  // Vite dev server default
-      'http://localhost:5174',  // Vite dev server (alternative port)
-      'http://localhost:4173',  // Vite preview
-      'http://localhost:8080',  // Alternative dev port
-      'https://level-up-ashy-sigma.vercel.app',  // Production frontend on Vercel
-    ],
+    origin: (origin, callback) => {
+      // Permitir requests sin origin (como Postman, mobile apps, etc)
+      if (!origin) return callback(null, true);
+      
+      // Verificar si el origin está en la lista permitida
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     credentials: true,
     allowedHeaders: [
-      'Content-Type', 
-      'Authorization', 
+      'Content-Type',
+      'Authorization',
       'X-Requested-With',
       'Accept',
       'Origin',
+      'Access-Control-Request-Method',
+      'Access-Control-Request-Headers',
     ],
     exposedHeaders: ['Content-Length', 'Content-Type'],
     preflightContinue: false,
     optionsSuccessStatus: 204,
+    maxAge: 86400, // 24 horas de cache para preflight
   });
-
-  // Global prefix for all routes
-  app.setGlobalPrefix('api/ai');
 
   // Global validation pipe
   app.useGlobalPipes(
