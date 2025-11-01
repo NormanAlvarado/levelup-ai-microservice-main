@@ -54,7 +54,7 @@ export class GenerateDietDto {
   @IsNumber()
   @Min(3)
   @Max(6)
-  @Transform(({ value }) => parseInt(value))
+  @Transform(({ value }) => (value != null ? parseInt(String(value), 10) : undefined))
   mealsPerDay?: number;
 
   @ApiProperty({
@@ -66,7 +66,7 @@ export class GenerateDietDto {
   @IsNumber()
   @Min(50)
   @Max(300)
-  @Transform(({ value }) => parseInt(value))
+  @Transform(({ value }) => (value != null ? parseInt(String(value), 10) : undefined))
   targetProtein?: number;
 
   @ApiProperty({

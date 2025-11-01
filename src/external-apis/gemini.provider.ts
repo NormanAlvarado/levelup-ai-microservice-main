@@ -220,46 +220,70 @@ IMPORTANTE:
               {
                 parts: [
                   {
-                    text: `Eres un nutricionista experto. Genera un plan nutricional personalizado en formato JSON válido.
-                    El JSON debe tener la estructura exacta: {
-                      "name": "string",
-                      "description": "string",
-                      "meals": [
-                        {
-                          "name": "string",
-                          "items": [
-                            {
-                              "name": "string",
-                              "quantity": "string",
-                              "calories": number,
-                              "protein": number,
-                              "carbs": number,
-                              "fat": number
-                            }
-                          ],
-                          "totalCalories": number,
-                          "macros": {
-                            "protein": number,
-                            "carbs": number,
-                            "fat": number,
-                            "fiber": number
-                          },
-                          "instructions": "string (opcional)",
-                          "prepTime": number
-                        }
-                      ]
-                    }
-                    
-                    ${prompt}
-                    
-                    Responde SOLO con el JSON válido, sin texto adicional ni markdown.`
+                    text: `Eres un nutricionista experto. Genera un plan nutricional SEMANAL COMPLETO (7 DÍAS) en formato JSON.
+
+IMPORTANTE: Responde SOLO con JSON válido, sin markdown, sin explicaciones, sin \`\`\`json.
+
+Estructura JSON requerida - Debes generar comidas para TODA LA SEMANA:
+{
+  "name": "Nombre del Plan (string)",
+  "description": "Descripción breve (string)",
+  "meals": [
+    // COMIDAS DEL LUNES (${dto.mealsPerDay || 4} comidas)
+    {
+      "name": "Desayuno - Lunes",
+      "items": [
+        {
+          "name": "Nombre del alimento",
+          "quantity": "Cantidad con unidad (ej: 100g, 1 taza)",
+          "calories": 0,
+          "protein": 0,
+          "carbs": 0,
+          "fat": 0,
+          "fiber": 0
+        }
+      ],
+      "totalCalories": 0,
+      "macros": { "protein": 0, "carbs": 0, "fat": 0, "fiber": 0 },
+      "instructions": "Instrucciones de preparación",
+      "prepTime": 0
+    },
+    // ... más comidas del Lunes (Media Mañana, Almuerzo, Merienda, Cena)
+    
+    // COMIDAS DEL MARTES (${dto.mealsPerDay || 4} comidas DIFERENTES)
+    {
+      "name": "Desayuno - Martes",
+      "items": [ /* INGREDIENTES DIFERENTES AL LUNES */ ],
+      // ...
+    },
+    // ... continúa con Miércoles, Jueves, Viernes, Sábado, Domingo
+    
+    // TOTAL: ${(dto.mealsPerDay || 4) * 7} comidas en el array
+  ]
+}
+
+REGLAS CRÍTICAS:
+1. El array "meals" debe tener EXACTAMENTE ${(dto.mealsPerDay || 4) * 7} elementos (${dto.mealsPerDay || 4} comidas × 7 días)
+2. Nombra cada comida indicando el día: "Desayuno - Lunes", "Almuerzo - Martes", etc.
+3. VARÍA LOS INGREDIENTES: No repitas la misma proteína principal más de 2 veces en la semana
+4. Alterna carbohidratos: arroz, quinoa, pasta, avena, batata, etc.
+5. Usa diferentes verduras y frutas cada día
+
+${prompt}
+
+RECUERDA: 
+- Solo JSON válido, sin ningún texto extra
+- Genera TODAS las comidas de los 7 días (${(dto.mealsPerDay || 4) * 7} comidas totales)
+- VARIEDAD es esencial: cada día debe tener comidas DIFERENTES`
                   }
                 ]
               }
             ],
             generationConfig: {
               temperature: 0.7,
-              maxOutputTokens: 1000,
+              maxOutputTokens: 8000, // Aumentado para planes semanales completos (35 comidas)
+              topP: 0.95,
+              topK: 40,
             }
           },
           {
@@ -274,28 +298,60 @@ IMPORTANTE:
         throw new InternalServerErrorException('No se recibió respuesta de Gemini AI');
       }
 
+      // Limpiar la respuesta de posibles marcadores de código
+      let cleanContent = content
+        .replace(/```json\s*/g, '')
+        .replace(/```\s*/g, '')
+        .trim();
+
       // Extraer JSON de la respuesta
-      const start = content.indexOf('{');
-      const end = content.lastIndexOf('}');
+      const start = cleanContent.indexOf('{');
+      const end = cleanContent.lastIndexOf('}');
       
       if (start === -1 || end === -1) {
+        this.logger.error('No se encontró JSON en la respuesta:', cleanContent.substring(0, 200));
         throw new BadRequestException('No se encontró un bloque JSON válido en la respuesta de IA');
       }
 
-      const jsonString = content.substring(start, end + 1).trim();
+      const jsonString = cleanContent.substring(start, end + 1).trim();
       
       try {
         const dietData = JSON.parse(jsonString);
         
         // Validar estructura requerida
         if (!dietData.name || !dietData.description || !Array.isArray(dietData.meals)) {
+          this.logger.error('Estructura inválida:', dietData);
           throw new BadRequestException('El plan dietético generado no contiene los campos requeridos');
         }
 
         return dietData;
       } catch (parseError) {
-        this.logger.error('Error parsing diet JSON:', parseError);
-        throw new BadRequestException('No se pudo parsear el plan dietético generado por IA');
+        this.logger.error('Error parsing diet JSON:');
+        this.logger.error(parseError);
+        this.logger.error('JSON String (primeros 500 chars):', jsonString.substring(0, 500));
+        
+        // Intentar reparar JSON común
+        try {
+          // Remover comas finales antes de ] o }
+          const repairedJson = jsonString
+            .replace(/,(\s*[}\]])/g, '$1')
+            // Remover saltos de línea dentro de strings
+            .replace(/"\s*\n\s*"/g, '" "')
+            // Remover caracteres de control
+            .replace(/[\x00-\x1F\x7F]/g, '');
+          
+          const dietData = JSON.parse(repairedJson);
+          
+          if (!dietData.name || !dietData.description || !Array.isArray(dietData.meals)) {
+            throw new BadRequestException('El plan dietético generado no contiene los campos requeridos');
+          }
+          
+          this.logger.log('JSON reparado exitosamente');
+          return dietData;
+        } catch (repairError) {
+          this.logger.error('No se pudo reparar el JSON');
+          throw new BadRequestException('No se pudo parsear el plan dietético generado por IA');
+        }
       }
 
     } catch (error) {

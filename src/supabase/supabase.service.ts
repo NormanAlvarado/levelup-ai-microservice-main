@@ -1,3 +1,5 @@
+/* eslint-disable prettier/prettier */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
@@ -18,10 +20,23 @@ export class SupabaseService {
       throw new Error('Supabase configuration is missing');
     }
 
-    this.supabase = createClient(supabaseUrl, supabaseKey);
+    // Create client with service_role key and options to bypass RLS
+    this.supabase = createClient(supabaseUrl, supabaseKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+      db: {
+        schema: 'public',
+      },
+    });
+
+    this.logger.log('✅ Supabase client initialized with service_role key');
   }
 
-  async saveWorkoutPlan(workoutPlan: Partial<WorkoutPlan>): Promise<WorkoutPlan> {
+  async saveWorkoutPlan(
+    workoutPlan: Partial<WorkoutPlan>,
+  ): Promise<WorkoutPlan> {
     try {
       const { data, error } = await this.supabase
         .from('workout_routines')
@@ -76,13 +91,16 @@ export class SupabaseService {
     }
   }
 
-  private async saveWorkoutExercises(routineId: string, exercises: any[]): Promise<void> {
+  private async saveWorkoutExercises(
+    routineId: string,
+    exercises: any[],
+  ): Promise<void> {
     try {
       // Prepare all exercise data in parallel
       const exercisePromises = exercises.map(async (exercise, index) => {
         // Create or find exercise in exercises table
         const exerciseId = await this.findOrCreateExercise(exercise);
-        
+
         // Parse reps (e.g., "10-12" or "30-60 seg")
         let repsMin = 10;
         let repsMax = 12;
@@ -127,7 +145,9 @@ export class SupabaseService {
       if (linkError) {
         this.logger.error('Error linking exercises:', linkError);
       } else {
-        this.logger.log(`Successfully linked ${routineExercises.length} exercises to routine ${routineId}`);
+        this.logger.log(
+          `Successfully linked ${routineExercises.length} exercises to routine ${routineId}`,
+        );
       }
     } catch (error) {
       this.logger.error('Error saving workout exercises:', error);
@@ -135,36 +155,45 @@ export class SupabaseService {
     }
   }
 
-  private async saveWorkoutExercisesByDays(routineId: string, days: any[]): Promise<void> {
+  private async saveWorkoutExercisesByDays(
+    routineId: string,
+    days: any[],
+  ): Promise<void> {
     try {
       this.logger.log(`=== SAVING EXERCISES BY DAYS ===`);
       this.logger.log(`Routine ID: ${routineId}`);
       this.logger.log(`Number of days: ${days?.length || 0}`);
       this.logger.log(`Days data: ${JSON.stringify(days)}`);
-      
+
       const allExercisePromises: Promise<any>[] = [];
-      
+
       // Process all days and their exercises
       for (const day of days) {
         const dayNumber = day.dayNumber || 1;
         const exercises = day.exercises || [];
-        
-        this.logger.log(`Processing day ${dayNumber} with ${exercises.length} exercises`);
-        
+
+        this.logger.log(
+          `Processing day ${dayNumber} with ${exercises.length} exercises`,
+        );
+
         exercises.forEach((exercise, index) => {
           allExercisePromises.push(
-            this.processExerciseForDay(routineId, exercise, dayNumber, index)
+            this.processExerciseForDay(routineId, exercise, dayNumber, index),
           );
         });
       }
 
-      this.logger.log(`Total exercise promises to process: ${allExercisePromises.length}`);
+      this.logger.log(
+        `Total exercise promises to process: ${allExercisePromises.length}`,
+      );
 
       // Wait for all exercises to be processed in parallel
       const routineExercises = await Promise.all(allExercisePromises);
 
       this.logger.log(`Processed exercises: ${routineExercises.length}`);
-      this.logger.log(`Sample exercise data: ${JSON.stringify(routineExercises[0])}`);
+      this.logger.log(
+        `Sample exercise data: ${JSON.stringify(routineExercises[0])}`,
+      );
 
       // Insert all routine_exercises in one batch operation
       const { error: linkError } = await this.supabase
@@ -175,7 +204,9 @@ export class SupabaseService {
         this.logger.error('Error linking exercises:', linkError);
         throw linkError; // Throw the error so we can see it in logs
       } else {
-        this.logger.log(`Successfully linked ${routineExercises.length} exercises to routine ${routineId}`);
+        this.logger.log(
+          `Successfully linked ${routineExercises.length} exercises to routine ${routineId}`,
+        );
       }
     } catch (error) {
       this.logger.error('Error saving workout exercises by days:', error);
@@ -185,14 +216,14 @@ export class SupabaseService {
   }
 
   private async processExerciseForDay(
-    routineId: string, 
-    exercise: any, 
-    dayNumber: number, 
-    orderInDay: number
+    routineId: string,
+    exercise: any,
+    dayNumber: number,
+    orderInDay: number,
   ): Promise<any> {
     // Create or find exercise in exercises table
     const exerciseId = await this.findOrCreateExercise(exercise);
-    
+
     // Parse reps (e.g., "10-12" or "30-60 seg")
     let repsMin = 10;
     let repsMax = 12;
@@ -230,7 +261,7 @@ export class SupabaseService {
     try {
       // Use upsert to avoid race conditions and speed up the process
       const exerciseName = exerciseData.name.trim();
-      
+
       // First try to find existing
       const { data: existing } = await this.supabase
         .from('exercises')
@@ -266,11 +297,12 @@ export class SupabaseService {
           .select('id')
           .limit(1)
           .maybeSingle();
-        
+
         if (fallback) return fallback.id;
         throw createError;
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return newExercise.id;
     } catch (error) {
       this.logger.error('Error in findOrCreateExercise:', error);
@@ -281,17 +313,20 @@ export class SupabaseService {
   private inferEquipment(exerciseName: string): string {
     const name = exerciseName.toLowerCase();
     if (name.includes('barra') || name.includes('barbell')) return 'barbell';
-    if (name.includes('mancuerna') || name.includes('dumbbell')) return 'dumbbells';
+    if (name.includes('mancuerna') || name.includes('dumbbell'))
+      return 'dumbbells';
     if (name.includes('máquina') || name.includes('machine')) return 'machine';
     if (name.includes('kettlebell')) return 'kettlebell';
     if (name.includes('trx')) return 'trx';
-    if (name.includes('banda') || name.includes('band')) return 'resistance_band';
+    if (name.includes('banda') || name.includes('band'))
+      return 'resistance_band';
     return 'bodyweight';
   }
 
   async saveDietPlan(dietPlan: Partial<DietPlan>): Promise<DietPlan> {
     try {
-      const { data, error } = await this.supabase
+      // 1. Guardar el plan de dieta (sin meals)
+      const { data: savedPlan, error: planError } = await this.supabase
         .from('diet_plans')
         .insert([
           {
@@ -299,28 +334,321 @@ export class SupabaseService {
             name: dietPlan.name,
             description: dietPlan.description,
             goal: dietPlan.goal,
-            total_calories: dietPlan.totalCalories,
-            target_macros: dietPlan.targetMacros,
-            meals: dietPlan.meals,
-            restrictions: dietPlan.restrictions,
+            target_calories: dietPlan.totalCalories,
+            target_protein_g: dietPlan.targetMacros?.protein || 0,
+            target_carbs_g: dietPlan.targetMacros?.carbs || 0,
+            target_fat_g: dietPlan.targetMacros?.fat || 0,
+            generated_by_ai: true,
+            is_active: true,
           },
         ])
         .select()
         .single();
 
-      if (error) {
-        this.logger.error('Error saving diet plan:', error);
-        throw new Error(`Failed to save diet plan: ${error.message}`);
+      if (planError) {
+        this.logger.error('Error saving diet plan:', planError);
+        throw new Error(`Failed to save diet plan: ${planError.message}`);
       }
 
-      return this.mapDietPlanFromDB(data);
+      // 2. Guardar las comidas asociadas al plan
+      // La IA ahora genera comidas para toda la semana (ej: 35 comidas = 5 comidas × 7 días)
+      if (dietPlan.meals && dietPlan.meals.length > 0) {
+        this.logger.log(`📋 Procesando ${dietPlan.meals.length} comidas generadas por la IA`);
+        
+        const mealsToInsert: Array<{
+          diet_plan_id: string;
+          meal_type: string;
+          day_of_week: number;
+          name: string;
+          description: string;
+          preparation_time_minutes: number;
+          recipe_instructions: string;
+          order_in_day: number;
+        }> = [];
+        
+        // Determinar cuántas comidas por día (ej: 35 comidas / 7 días = 5 comidas/día)
+        const mealsPerDay = Math.ceil(dietPlan.meals.length / 7);
+        this.logger.log(`📊 Comidas por día: ${mealsPerDay}`);
+        
+        // Distribuir las comidas por día
+        dietPlan.meals.forEach((meal, globalIndex) => {
+          // Calcular el día de la semana (1-7) y el orden dentro del día
+          const day_of_week = Math.floor(globalIndex / mealsPerDay) + 1;
+          const order_in_day = (globalIndex % mealsPerDay) + 1;
+          
+          // Si el día excede 7, ajustar al último día
+          const finalDay = Math.min(day_of_week, 7);
+          
+          mealsToInsert.push({
+            diet_plan_id: savedPlan.id,
+            meal_type: this.inferMealType(meal.name),
+            day_of_week: finalDay,
+            name: meal.name,
+            description: meal.items
+              ?.map((item) => `${item.name} (${item.quantity})`)
+              .join(', '),
+            preparation_time_minutes: meal.prepTime || 30,
+            recipe_instructions:
+              meal.instructions || 'Preparar según indicaciones',
+            order_in_day: order_in_day,
+          });
+        });
+
+        this.logger.log(`📊 Total de comidas a insertar: ${mealsToInsert.length} distribuidas en 7 días`);
+        
+        const { data: insertedMeals, error: mealsError } = await this.supabase
+          .from('diet_meals')
+          .insert(mealsToInsert)
+          .select();
+
+        if (mealsError) {
+          this.logger.error('❌ Error saving diet meals:', mealsError);
+          // No lanzar error aquí, el plan ya fue guardado
+        } else {
+          this.logger.log(`✅ Comidas guardadas exitosamente: ${insertedMeals?.length || 0} comidas`);
+          
+          // 3. Procesar y guardar los alimentos individuales en la tabla foods y diet_meal_foods
+          if (insertedMeals && insertedMeals.length > 0) {
+            await this.processMealFoods(dietPlan.meals, insertedMeals);
+          }
+        }
+      }
+
+      // 3. Devolver el plan guardado con los datos completos
+      return {
+        id: savedPlan.id,
+        userId: savedPlan.user_id,
+        name: savedPlan.name,
+        description: savedPlan.description,
+        goal: savedPlan.goal,
+        totalCalories: savedPlan.target_calories,
+        targetMacros: {
+          protein: savedPlan.target_protein_g || 0,
+          carbs: savedPlan.target_carbs_g || 0,
+          fat: savedPlan.target_fat_g || 0,
+          fiber: 0,
+        },
+        meals: dietPlan.meals || [],
+        restrictions: dietPlan.restrictions || [],
+        createdAt: savedPlan.created_at,
+        updatedAt: savedPlan.updated_at,
+      };
     } catch (error) {
       this.logger.error('Error in saveDietPlan:', error);
       throw error;
     }
   }
 
-  async saveRecommendations(recommendations: Partial<Recommendation>[]): Promise<Recommendation[]> {
+  private inferMealType(mealName: string): string {
+    const name = mealName.toLowerCase();
+    if (name.includes('desayuno') || name.includes('breakfast'))
+      return 'breakfast';
+    if (
+      name.includes('almuerzo') ||
+      name.includes('comida') ||
+      name.includes('lunch')
+    )
+      return 'lunch';
+    if (name.includes('cena') || name.includes('dinner')) return 'dinner';
+    if (
+      name.includes('snack') ||
+      name.includes('colación') ||
+      name.includes('merienda')
+    )
+      return 'snack';
+    return 'snack';
+  }
+
+  /**
+   * Procesa los alimentos individuales de cada comida y los guarda en la base de datos
+   * - Busca si el alimento ya existe en la tabla 'foods'
+   * - Si no existe, lo crea con la información nutricional de la IA
+   * - Crea la relación en 'diet_meal_foods'
+   */
+  private async processMealFoods(meals: any[], insertedMeals: any[]): Promise<void> {
+    try {
+      this.logger.log(`🍎 Procesando alimentos individuales de ${meals.length} comidas`);
+      let totalFoodsProcessed = 0;
+      let newFoodsCreated = 0;
+
+      for (let i = 0; i < meals.length; i++) {
+        const meal = meals[i];
+        const insertedMeal = insertedMeals[i];
+
+        if (!meal.items || meal.items.length === 0) continue;
+        if (!insertedMeal?.id) continue;
+
+        for (const item of meal.items) {
+          // 1. Buscar si el alimento ya existe en la tabla foods
+          const { data: existingFood } = await this.supabase
+            .from('foods')
+            .select('id')
+            .ilike('name', item.name)
+            .maybeSingle();
+
+          let foodId: string;
+
+          if (existingFood) {
+            // El alimento ya existe
+            foodId = existingFood.id;
+          } else {
+            // 2. Crear el alimento nuevo en la tabla foods
+            this.logger.log(`🆕 Creando nuevo alimento: ${item.name}`);
+            
+            // Inferir categoría basada en el nombre
+            const category = this.inferFoodCategory(item.name);
+            
+            const { data: newFood, error: foodError } = await this.supabase
+              .from('foods')
+              .insert([{
+                name: item.name,
+                category: category,
+                calories_per_100g: item.calories || 0,
+                protein_per_100g: item.protein || 0,
+                carbs_per_100g: item.carbs || 0,
+                fat_per_100g: item.fat || 0,
+                fiber_per_100g: item.fiber || 0,
+                is_common: true, // Marcado como común porque fue generado por IA
+              }])
+              .select('id')
+              .single();
+
+            if (foodError) {
+              this.logger.error(`❌ Error creating food '${item.name}':`, foodError);
+              continue;
+            }
+
+            foodId = newFood.id;
+            newFoodsCreated++;
+          }
+
+          // 3. Crear la relación en diet_meal_foods
+          // Extraer cantidad en gramos del string quantity (ej: "100g" -> 100)
+          const quantityGrams = this.parseQuantityToGrams(item.quantity);
+
+          const { error: relationError } = await this.supabase
+            .from('diet_meal_foods')
+            .insert([{
+              meal_id: insertedMeal.id,
+              food_id: foodId,
+              quantity_grams: quantityGrams,
+              notes: item.quantity, // Guardar la cantidad original como nota
+            }]);
+
+          if (relationError) {
+            this.logger.error(`❌ Error creating meal-food relation:`, relationError);
+          } else {
+            totalFoodsProcessed++;
+          }
+        }
+      }
+
+      this.logger.log(`✅ Alimentos procesados: ${totalFoodsProcessed} | Nuevos creados: ${newFoodsCreated}`);
+    } catch (error) {
+      this.logger.error('❌ Error processing meal foods:', error);
+    }
+  }
+
+  /**
+   * Infiere la categoría del alimento basándose en su nombre
+   */
+  private inferFoodCategory(foodName: string): string {
+    const name = foodName.toLowerCase();
+    
+    // Proteínas
+    if (name.includes('pollo') || name.includes('pavo') || name.includes('carne') || 
+        name.includes('pescado') || name.includes('atún') || name.includes('salmón') ||
+        name.includes('huevo') || name.includes('tofu')) {
+      return 'Proteínas';
+    }
+    
+    // Lácteos
+    if (name.includes('leche') || name.includes('yogur') || name.includes('queso')) {
+      return 'Lácteos';
+    }
+    
+    // Granos y cereales
+    if (name.includes('arroz') || name.includes('avena') || name.includes('pan') ||
+        name.includes('pasta') || name.includes('quinoa') || name.includes('cereal')) {
+      return 'Granos';
+    }
+    
+    // Frutas
+    if (name.includes('manzana') || name.includes('plátano') || name.includes('naranja') ||
+        name.includes('fresa') || name.includes('arándano') || name.includes('uva')) {
+      return 'Frutas';
+    }
+    
+    // Verduras
+    if (name.includes('lechuga') || name.includes('tomate') || name.includes('brócoli') ||
+        name.includes('zanahoria') || name.includes('espinaca') || name.includes('pepino')) {
+      return 'Verduras';
+    }
+    
+    // Frutos secos y semillas
+    if (name.includes('nuez') || name.includes('almendra') || name.includes('semilla')) {
+      return 'Frutos Secos';
+    }
+    
+    // Aceites y grasas
+    if (name.includes('aceite') || name.includes('mantequilla') || name.includes('aguacate')) {
+      return 'Grasas';
+    }
+    
+    return 'Otros';
+  }
+
+  /**
+   * Parsea una cantidad en string a gramos
+   * Ejemplos: "100g" -> 100, "1 taza" -> 240, "1 cucharada" -> 15
+   */
+  private parseQuantityToGrams(quantity: string): number {
+    if (!quantity) return 100; // Default
+    
+    const quantityLower = quantity.toLowerCase();
+    
+    // Buscar número seguido de 'g' o 'gr'
+    const gramsMatch = quantityLower.match(/(\d+\.?\d*)\s*(g|gr|gramos?)/);
+    if (gramsMatch) return parseFloat(gramsMatch[1]);
+    
+    // Buscar número seguido de 'ml' (líquidos, asumir 1ml = 1g)
+    const mlMatch = quantityLower.match(/(\d+\.?\d*)\s*(ml|mililitros?)/);
+    if (mlMatch) return parseFloat(mlMatch[1]);
+    
+    // Conversiones aproximadas
+    if (quantityLower.includes('taza')) return 240;
+    if (quantityLower.includes('cucharada')) return 15;
+    if (quantityLower.includes('cucharadita')) return 5;
+    if (quantityLower.includes('mediano') || quantityLower.includes('media')) return 150;
+    if (quantityLower.includes('pequeño') || quantityLower.includes('pequeña')) return 100;
+    if (quantityLower.includes('grande')) return 200;
+    
+    // Buscar cualquier número
+    const numberMatch = quantityLower.match(/(\d+\.?\d*)/);
+    if (numberMatch) return parseFloat(numberMatch[1]);
+    
+    return 100; // Default fallback
+  }
+
+  private inferDayOfWeek(mealName: string, index: number): number {
+    // Si el nombre incluye un día, extraerlo
+    const name = mealName.toLowerCase();
+    if (name.includes('lunes') || name.includes('monday')) return 1;
+    if (name.includes('martes') || name.includes('tuesday')) return 2;
+    if (name.includes('miércoles') || name.includes('wednesday')) return 3;
+    if (name.includes('jueves') || name.includes('thursday')) return 4;
+    if (name.includes('viernes') || name.includes('friday')) return 5;
+    if (name.includes('sábado') || name.includes('saturday')) return 6;
+    if (name.includes('domingo') || name.includes('sunday')) return 7;
+
+    // Si no especifica día, distribuir las comidas equitativamente en los 7 días
+    // Usar módulo para ciclar: meal 0->día 1, meal 1->día 2, ..., meal 7->día 1, etc.
+    return (index % 7) + 1;
+  }
+
+  async saveRecommendations(
+    recommendations: Partial<Recommendation>[],
+  ): Promise<Recommendation[]> {
     try {
       const dbRecommendations = recommendations.map((rec) => ({
         user_id: rec.userId,
@@ -457,5 +785,61 @@ export class SupabaseService {
       metadata: data.metadata,
       createdAt: data.created_at,
     };
+  }
+
+  /**
+   * Guarda un log de generación de IA (adaptado a la estructura real de la DB)
+   */
+  async saveAIGenerationLog(logData: {
+    userId: string;
+    requestType: 'workout' | 'diet' | 'recommendation' | 'analysis' | 'recipe';
+    provider: 'openai' | 'gemini' | 'anthropic';
+    model: string;
+    promptTokens?: number;
+    completionTokens?: number;
+    totalTokens?: number;
+    requestData?: any;
+    responseData?: any;
+    success: boolean;
+    errorMessage?: string;
+    latencyMs?: number;
+    routineId?: string;
+    dietPlanId?: string;
+  }): Promise<void> {
+    try {
+      // Convertir requestData y responseData a texto JSON para el campo prompt_used y response_received
+      const promptUsed = JSON.stringify(logData.requestData || {}, null, 2);
+      const responseReceived = logData.responseData 
+        ? JSON.stringify(logData.responseData, null, 2) 
+        : null;
+
+      const { error } = await this.supabase
+        .from('ai_generation_logs')
+        .insert([
+          {
+            user_id: logData.userId,
+            generation_type: logData.requestType,
+            ai_model: logData.model,
+            prompt_used: promptUsed,
+            response_received: responseReceived,
+            routine_id: logData.routineId || null,
+            diet_plan_id: logData.dietPlanId || null,
+            processing_time_ms: logData.latencyMs || null,
+            tokens_used: logData.totalTokens || null,
+            success: logData.success,
+            error_message: logData.errorMessage || null,
+          },
+        ]);
+
+      if (error) {
+        this.logger.error('Error saving AI generation log:', error);
+        // No lanzamos error porque es un log secundario
+      } else {
+        this.logger.log(`✅ AI generation log saved for user ${logData.userId} (${logData.requestType})`);
+      }
+    } catch (error) {
+      this.logger.error('Error in saveAIGenerationLog:', error);
+      // No lanzamos error porque es un log secundario
+    }
   }
 }
