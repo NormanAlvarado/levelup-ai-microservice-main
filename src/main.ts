@@ -15,6 +15,7 @@ async function bootstrap() {
       'http://localhost:5174',  // Vite dev server (alternative port)
       'http://localhost:4173',  // Vite preview
       'http://localhost:8080',  // Alternative dev port
+      'https://level-up-ashy-sigma.vercel.app',  // Production frontend on Vercel
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     credentials: true,
