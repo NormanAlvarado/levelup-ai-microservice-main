@@ -51,8 +51,9 @@ async function bootstrap() {
     customCss: '.swagger-ui .topbar { display: none }',
   });
 
-  const port = process.env.AI_SERVICE_PORT || 3005;
-  await app.listen(port);
+  // Render usa PORT por defecto, fallback a AI_SERVICE_PORT o 3005
+  const port = process.env.PORT || process.env.AI_SERVICE_PORT || 3005;
+  await app.listen(port, '0.0.0.0');
 
   console.log(`🚀 LevelUp AI Microservice is running on: http://localhost:${port}`);
   console.log(`📚 API Documentation: http://localhost:${port}/api/ai/docs`);
