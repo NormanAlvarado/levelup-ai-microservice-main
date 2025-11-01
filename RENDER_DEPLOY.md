@@ -54,6 +54,7 @@ AI_SERVICE_PORT=10000
 - El puerto se asigna automáticamente via variable `PORT`
 - El primer despliegue puede tardar 5-10 minutos
 - Los servicios gratuitos se duermen después de 15 minutos de inactividad
+- El Dockerfile está configurado para usar `--legacy-peer-deps` para resolver conflictos de dependencias
 
 ## CORS Configuration:
 
