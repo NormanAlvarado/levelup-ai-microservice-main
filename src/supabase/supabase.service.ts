@@ -807,6 +807,14 @@ export class SupabaseService {
     dietPlanId?: string;
   }): Promise<void> {
     try {
+      // Map requestType to valid generation_type values
+      let generationType: 'workout_routine' | 'diet_plan';
+      if (logData.requestType === 'workout' || logData.requestType === 'recommendation' || logData.requestType === 'analysis') {
+        generationType = 'workout_routine';
+      } else {
+        generationType = 'diet_plan';
+      }
+
       // Convertir requestData y responseData a texto JSON para el campo prompt_used y response_received
       const promptUsed = JSON.stringify(logData.requestData || {}, null, 2);
       const responseReceived = logData.responseData 
@@ -818,7 +826,7 @@ export class SupabaseService {
         .insert([
           {
             user_id: logData.userId,
-            generation_type: logData.requestType,
+            generation_type: generationType,
             ai_model: logData.model,
             prompt_used: promptUsed,
             response_received: responseReceived,
@@ -835,7 +843,7 @@ export class SupabaseService {
         this.logger.error('Error saving AI generation log:', error);
         // No lanzamos error porque es un log secundario
       } else {
-        this.logger.log(`✅ AI generation log saved for user ${logData.userId} (${logData.requestType})`);
+        this.logger.log(`✅ AI generation log saved for user ${logData.userId} (${logData.requestType} -> ${generationType})`);
       }
     } catch (error) {
       this.logger.error('Error in saveAIGenerationLog:', error);
