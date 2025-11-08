@@ -194,7 +194,17 @@ export class DietService {
         goal: modifications.goal || existingPlan.goal,
         restrictions: modifications.restrictions || existingPlan.restrictions,
         mealsPerDay: modifications.mealsPerDay,
-        targetProtein: modifications.targetProtein,
+        // Ensure targetProtein is a number and within allowed bounds (50 - 300)
+        targetProtein: (() => {
+          const raw = modifications.targetProtein;
+          if (raw == null) return undefined;
+          const parsed = Number(raw);
+          if (Number.isNaN(parsed)) return undefined;
+          // Clamp to allowed range
+          if (parsed < 50) return 50;
+          if (parsed > 300) return 300;
+          return Math.round(parsed);
+        })(),
         preferredFoods: modifications.preferredFoods,
         avoidFoods: modifications.avoidFoods,
         preferences: modifications.preferences,
