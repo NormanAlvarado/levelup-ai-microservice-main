@@ -792,7 +792,7 @@ export class SupabaseService {
    */
   async saveAIGenerationLog(logData: {
     userId: string;
-    requestType: 'workout' | 'diet' | 'recommendation' | 'analysis' | 'recipe';
+    requestType: 'workout' | 'diet' | 'recommendation' | 'analysis' | 'recipe' | 'motivation';
     provider: 'openai' | 'gemini' | 'anthropic';
     model: string;
     promptTokens?: number;
@@ -808,11 +808,17 @@ export class SupabaseService {
   }): Promise<void> {
     try {
       // Map requestType to valid generation_type values
-      let generationType: 'workout_routine' | 'diet_plan';
-      if (logData.requestType === 'workout' || logData.requestType === 'recommendation' || logData.requestType === 'analysis') {
+      let generationType: 'workout_routine' | 'diet_plan' | 'recommendation' | 'motivation';
+      if (logData.requestType === 'workout' || logData.requestType === 'analysis') {
         generationType = 'workout_routine';
-      } else {
+      } else if (logData.requestType === 'diet') {
         generationType = 'diet_plan';
+      } else if (logData.requestType === 'recommendation') {
+        generationType = 'recommendation';
+      } else if (logData.requestType === 'motivation') {
+        generationType = 'motivation';
+      } else {
+        generationType = 'workout_routine'; // default
       }
 
       // Convertir requestData y responseData a texto JSON para el campo prompt_used y response_received

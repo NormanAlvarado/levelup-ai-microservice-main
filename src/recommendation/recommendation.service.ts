@@ -104,42 +104,88 @@ export class RecommendationService {
     userId: string,
     context?: string
   ): Promise<ApiResponse<any>> {
+    const startTime = Date.now();
     try {
       this.logger.log(`Generating motivational content for user: ${userId}`);
 
-      // Create a simple recommendation DTO for motivational content
-      const motivationDto: RecommendationDto = {
-        userId,
-        progressData: {
-          completedWorkouts: 0,
-          adherenceRate: 75, // Default moderate adherence
+      // Generate motivational messages directly (no AI needed for basic motivation)
+      const motivationalMessages = [
+        {
+          title: '¡Sigue adelante!',
+          description: 'Cada día de entrenamiento te acerca más a tus metas. Tu dedicación es admirable.',
+          type: 'motivational',
+          priority: 'medium'
         },
-        context: `Generate motivational content. ${context || 'Focus on encouragement and positive reinforcement.'}`,
-        requestedTypes: ['motivational' as any],
+        {
+          title: 'La constancia es clave',
+          description: 'No se trata de ser perfecto, sino de ser consistente. Cada pequeño paso cuenta.',
+          type: 'encouragement',
+          priority: 'medium'
+        },
+        {
+          title: 'Tu progreso es importante',
+          description: 'Recuerda que el cambio lleva tiempo. Celebra cada logro, por pequeño que sea.',
+          type: 'progress',
+          priority: 'low'
+        }
+      ];
+
+      this.logger.log('Getting daily tip...');
+      const dailyTip = this.getDailyTip();
+      
+      this.logger.log('Getting inspirational quote...');
+      const quote = this.getInspirationalQuote();
+
+      const result = {
+        userId,
+        motivationalMessages,
+        dailyTip,
+        quote,
       };
 
-      // Use the existing recommendation generation but filter for motivational only
-      const response = await this.generateRecommendations(motivationDto);
-      
-      if (!response.success || !response.data) {
-        return createErrorResponse('Failed to generate motivational content');
-      }
+      // Calcular tiempo de procesamiento
+      const processingTime = Date.now() - startTime;
 
-      // Extract only motivational recommendations
-      const motivationalContent = response.data.filter(rec => 
-        rec.type === 'motivational' || rec.category === 'motivation'
-      );
-
-      return createSuccessResponse({
+      // Guardar log en Supabase
+      await this.supabaseService.saveAIGenerationLog({
         userId,
-        motivationalMessages: motivationalContent,
-        dailyTip: this.getDailyTip(),
-        quote: this.getInspirationalQuote(),
-      }, 'Motivational content generated successfully');
+        requestType: 'motivation',
+        provider: 'gemini',
+        model: 'internal-motivation-v1',
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+        requestData: { context: context || 'general' },
+        responseData: result,
+        success: true,
+        latencyMs: processingTime,
+      });
+
+      this.logger.log('Motivational content generated successfully');
+      return createSuccessResponse(result, 'Motivational content generated successfully');
     } catch (error) {
+      const processingTime = Date.now() - startTime;
+      
+      // Guardar log de error en Supabase
+      await this.supabaseService.saveAIGenerationLog({
+        userId,
+        requestType: 'motivation',
+        provider: 'gemini',
+        model: 'internal-motivation-v1',
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+        requestData: { context: context || 'general' },
+        responseData: null,
+        success: false,
+        errorMessage: error.message || 'Unknown error',
+        latencyMs: processingTime,
+      });
+
       this.logger.error('Error generating motivational content:', error);
+      this.logger.error('Error stack:', error.stack);
       return createErrorResponse(
-        error.message,
+        error.message || 'Unknown error',
         'Failed to generate motivational content'
       );
     }
@@ -167,11 +213,16 @@ export class RecommendationService {
 
   private getGeneralTips(userProfile: any): string[] {
     const tips = [
-      'Stay hydrated by drinking at least 8 glasses of water daily',
-      'Aim for 7-9 hours of quality sleep each night',
-      'Include both cardio and strength training in your routine',
-      'Listen to your body and allow for rest days',
-      'Focus on whole, unprocessed foods for better nutrition',
+      'Mantente hidratado bebiendo al menos 8 vasos de agua diariamente',
+      'Procura dormir de 7 a 9 horas cada noche para una recuperación óptima',
+      'Calienta adecuadamente antes de cada entrenamiento',
+      'Enfócate en la forma correcta antes de aumentar el peso',
+      'Escucha a tu cuerpo y descansa cuando sea necesario',
+      'Registra tu progreso para mantenerte motivado',
+      'Come proteína suficiente para recuperación muscular',
+      'Varía tus ejercicios para evitar estancamiento',
+      'Incluye cardio y entrenamiento de fuerza en tu rutina',
+      'Enfócate en alimentos integrales no procesados',
     ];
 
     return tips.slice(0, 3); // Return 3 random tips
@@ -181,14 +232,14 @@ export class RecommendationService {
     const steps: string[] = [];
 
     if (!workoutPlan) {
-      steps.push('Create your first personalized workout plan');
+      steps.push('Crea tu primer plan de entrenamiento personalizado');
     }
     if (!dietPlan) {
-      steps.push('Generate a nutrition plan aligned with your goals');
+      steps.push('Genera un plan de nutrición alineado con tus objetivos');
     }
     if (workoutPlan && dietPlan) {
-      steps.push('Track your progress and update plans as needed');
-      steps.push('Consider adding variety to prevent plateaus');
+      steps.push('Registra tu progreso y actualiza tus planes según sea necesario');
+      steps.push('Considera agregar variedad para prevenir estancamiento');
     }
 
     return steps;
@@ -218,21 +269,21 @@ export class RecommendationService {
   private getWorkoutRecommendation(workoutPlan: any): string {
     const exerciseCount = workoutPlan.exercises?.length || 0;
     if (exerciseCount < 5) {
-      return 'Consider adding more exercises for a complete workout';
+      return 'Considera agregar más ejercicios para un entrenamiento completo';
     } else if (exerciseCount > 12) {
-      return 'Great comprehensive plan! Make sure to allow adequate rest between sets';
+      return '¡Plan completo y bien estructurado! Asegúrate de descansar adecuadamente entre series';
     }
-    return 'Well-balanced workout plan. Stay consistent for best results';
+    return 'Plan de entrenamiento bien balanceado. Mantén la consistencia para mejores resultados';
   }
 
   private getDietRecommendation(dietPlan: any): string {
     const calories = dietPlan.totalCalories;
     if (calories < 1500) {
-      return 'Consider increasing calories to ensure adequate nutrition';
+      return 'Considera aumentar las calorías para asegurar nutrición adecuada';
     } else if (calories > 3000) {
-      return 'High calorie plan - make sure it aligns with your activity level';
+      return 'Plan alto en calorías - asegúrate de que se alinee con tu nivel de actividad';
     }
-    return 'Balanced calorie distribution. Focus on consistent meal timing';
+    return 'Distribución calórica balanceada. Enfócate en horarios de comidas consistentes';
   }
 
   private calculateMealVariety(meals: any[]): number {
@@ -250,11 +301,14 @@ export class RecommendationService {
 
   private getDailyTip(): string {
     const tips = [
-      'Start your day with a glass of water to kickstart your metabolism',
-      'Take the stairs instead of the elevator when possible',
-      'Practice mindful eating by chewing slowly and savoring your food',
-      'Do a 5-minute stretch routine before bed for better sleep',
-      'Plan your meals in advance to avoid unhealthy food choices',
+      'Comienza tu día con un vaso de agua para activar tu metabolismo',
+      'Usa las escaleras en lugar del elevador cuando sea posible',
+      'Practica alimentación consciente masticando despacio y saboreando tu comida',
+      'Haz una rutina de estiramiento de 5 minutos antes de dormir para mejor descanso',
+      'Planifica tus comidas con anticipación para evitar opciones poco saludables',
+      'Toma descansos activos durante el día para mantener la energía',
+      'Mantén un registro de tus entrenamientos para ver tu progreso',
+      'Come una fuente de proteína en cada comida principal',
     ];
     
     return tips[Math.floor(Math.random() * tips.length)];
@@ -262,11 +316,14 @@ export class RecommendationService {
 
   private getInspirationalQuote(): string {
     const quotes = [
-      '"The only bad workout is the one that didn\'t happen." - Unknown',
-      '"Your body can do it. It\'s your mind you have to convince." - Unknown',
-      '"Success isn\'t given. It\'s earned in the gym." - Unknown',
-      '"The groundwork for all happiness is good health." - Leigh Hunt',
-      '"Take care of your body. It\'s the only place you have to live." - Jim Rohn',
+      '"El único mal entrenamiento es el que no sucedió." - Desconocido',
+      '"Tu cuerpo puede hacerlo. Es tu mente la que tienes que convencer." - Desconocido',
+      '"El éxito no se da. Se gana en el gimnasio." - Desconocido',
+      '"La base de toda felicidad es la buena salud." - Leigh Hunt',
+      '"Cuida tu cuerpo. Es el único lugar que tienes para vivir." - Jim Rohn',
+      '"La disciplina es hacer lo que debe hacerse, cuando debe hacerse, tan bien como se puede hacer." - Desconocido',
+      '"No cuentes los días, haz que los días cuenten." - Muhammad Ali',
+      '"El dolor es temporal. El orgullo es para siempre." - Desconocido',
     ];
     
     return quotes[Math.floor(Math.random() * quotes.length)];

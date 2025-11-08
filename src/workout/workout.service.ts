@@ -19,6 +19,7 @@ export class WorkoutService {
   ) {}
 
   async generateWorkout(dto: GenerateWorkoutDto): Promise<ApiResponse<WorkoutPlan>> {
+    const startTime = Date.now();
     try {
       this.logger.log(`Generating workout for user: ${dto.userId}`);
 
@@ -27,20 +28,58 @@ export class WorkoutService {
       
       // Generate workout plan using selected AI provider
       let aiResponse;
+      let model = '';
       if (provider === 'gemini') {
         aiResponse = await this.geminiProvider.generateWorkoutPlan(dto);
+        model = 'gemini-1.5-flash';
       } else {
         aiResponse = await this.openAiProvider.generateWorkoutPlan(dto);
+        model = 'gpt-4o-mini';
       }
 
-      return await this.processWorkoutPlan(dto, aiResponse);
+      const result = await this.processWorkoutPlan(dto, aiResponse);
+      
+      // Log successful generation
+      if (result.success && result.data) {
+        const processingTime = Date.now() - startTime;
+        await this.supabaseService.saveAIGenerationLog({
+          userId: dto.userId,
+          requestType: 'workout',
+          provider: provider as 'openai' | 'gemini' | 'anthropic',
+          model,
+          requestData: dto,
+          responseData: result.data,
+          success: true,
+          latencyMs: processingTime,
+          routineId: result.data.id,
+        });
+      }
+      
+      return result;
     } catch (error) {
+      const processingTime = Date.now() - startTime;
+      const provider = this.configService.get<string>('ai.defaultProvider') || 'gemini';
+      
+      // Log failed generation
+      await this.supabaseService.saveAIGenerationLog({
+        userId: dto.userId,
+        requestType: 'workout',
+        provider: provider as 'openai' | 'gemini' | 'anthropic',
+        model: provider === 'gemini' ? 'gemini-1.5-flash' : 'gpt-4o-mini',
+        requestData: dto,
+        responseData: null,
+        success: false,
+        errorMessage: error.message,
+        latencyMs: processingTime,
+      });
+      
       this.logger.error('Error generating workout plan:', error);
       return createErrorResponse('Error al generar plan de entrenamiento');
     }
   }
 
   async generatePersonalizedWorkout(dto: GenerateWorkoutDto): Promise<ApiResponse<WorkoutPlan>> {
+    const startTime = Date.now();
     try {
       this.logger.log(`Generating personalized workout for user: ${dto.userId}`);
 
@@ -52,14 +91,51 @@ export class WorkoutService {
       
       // Generate workout plan using selected AI provider with user profile
       let aiResponse;
+      let model = '';
       if (provider === 'gemini') {
         aiResponse = await this.geminiProvider.generateWorkoutPlan(dto, userProfile);
+        model = 'gemini-1.5-flash';
       } else {
         aiResponse = await this.openAiProvider.generateWorkoutPlan(dto);
+        model = 'gpt-4o-mini';
       }
 
-      return await this.processWorkoutPlan(dto, aiResponse);
+      const result = await this.processWorkoutPlan(dto, aiResponse);
+      
+      // Log successful generation
+      if (result.success && result.data) {
+        const processingTime = Date.now() - startTime;
+        await this.supabaseService.saveAIGenerationLog({
+          userId: dto.userId,
+          requestType: 'workout',
+          provider: provider as 'openai' | 'gemini' | 'anthropic',
+          model,
+          requestData: { ...dto, userProfile },
+          responseData: result.data,
+          success: true,
+          latencyMs: processingTime,
+          routineId: result.data.id,
+        });
+      }
+      
+      return result;
     } catch (error) {
+      const processingTime = Date.now() - startTime;
+      const provider = this.configService.get<string>('ai.defaultProvider') || 'gemini';
+      
+      // Log failed generation
+      await this.supabaseService.saveAIGenerationLog({
+        userId: dto.userId,
+        requestType: 'workout',
+        provider: provider as 'openai' | 'gemini' | 'anthropic',
+        model: provider === 'gemini' ? 'gemini-1.5-flash' : 'gpt-4o-mini',
+        requestData: dto,
+        responseData: null,
+        success: false,
+        errorMessage: error.message,
+        latencyMs: processingTime,
+      });
+      
       this.logger.error('Error generating personalized workout plan:', error);
       return createErrorResponse('Error al generar plan de entrenamiento personalizado');
     }

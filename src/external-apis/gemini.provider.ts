@@ -355,8 +355,24 @@ RECUERDA:
       }
 
     } catch (error) {
-      this.logger.error('Error generating diet plan with Gemini:', error?.response?.data || error);
-      throw new InternalServerErrorException('Error al generar plan dietético con IA');
+      this.logger.error('Error generating diet plan with Gemini:');
+      this.logger.error('Error type:', error?.constructor?.name);
+      this.logger.error('Error message:', error?.message);
+      this.logger.error('Error response:', error?.response?.data);
+      this.logger.error('Error status:', error?.response?.status);
+      this.logger.error('Full error:', error);
+      
+      // Verificar si es un error de rate limit
+      if (error?.response?.status === 429) {
+        throw new InternalServerErrorException('Límite de requests excedido. Por favor espera un momento e intenta de nuevo.');
+      }
+      
+      // Verificar si es un error de API key
+      if (error?.response?.status === 403 || error?.response?.status === 401) {
+        throw new InternalServerErrorException('Error de autenticación con la API de Gemini. Verifica la configuración.');
+      }
+      
+      throw new InternalServerErrorException(`Error al generar plan dietético con IA: ${error?.message || 'Error desconocido'}`);
     }
   }
 

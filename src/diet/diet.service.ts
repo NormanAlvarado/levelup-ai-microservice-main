@@ -19,6 +19,7 @@ export class DietService {
   ) {}
 
   async generateDiet(dto: GenerateDietDto): Promise<ApiResponse<DietPlan>> {
+    const startTime = Date.now();
     try {
       this.logger.log(`Generating diet plan for user: ${dto.userId}`);
 
@@ -27,14 +28,51 @@ export class DietService {
       
       // Generate diet plan using selected AI provider
       let aiResponse;
+      let model = '';
       if (provider === 'gemini') {
         aiResponse = await this.geminiProvider.generateDietPlan(dto);
+        model = 'gemini-1.5-flash';
       } else {
         aiResponse = await this.openAiProvider.generateDietPlan(dto);
+        model = 'gpt-4o-mini';
       }
 
-      return await this.processDietPlan(dto, aiResponse);
+      const result = await this.processDietPlan(dto, aiResponse);
+      
+      // Log successful generation
+      if (result.success && result.data) {
+        const latencyMs = Date.now() - startTime;
+        await this.supabaseService.saveAIGenerationLog({
+          userId: dto.userId,
+          requestType: 'diet',
+          provider: provider as 'openai' | 'gemini' | 'anthropic',
+          model,
+          requestData: dto,
+          responseData: { mealsCount: aiResponse.meals?.length || 0 },
+          success: true,
+          latencyMs,
+          dietPlanId: result.data.id,
+        });
+      }
+      
+      return result;
     } catch (error) {
+      const latencyMs = Date.now() - startTime;
+      const provider = this.configService.get<string>('ai.defaultProvider') || 'gemini';
+      
+      // Log error in AI generation
+      await this.supabaseService.saveAIGenerationLog({
+        userId: dto.userId,
+        requestType: 'diet',
+        provider: provider as 'openai' | 'gemini' | 'anthropic',
+        model: provider === 'gemini' ? 'gemini-1.5-flash' : 'gpt-4o-mini',
+        requestData: dto,
+        responseData: null,
+        success: false,
+        errorMessage: error.message,
+        latencyMs,
+      });
+      
       this.logger.error('Error generating diet plan:', error);
       return createErrorResponse('Error al generar plan dietético');
     }
