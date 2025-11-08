@@ -66,7 +66,12 @@ export class GenerateDietDto {
   @IsNumber()
   @Min(50)
   @Max(300)
-  @Transform(({ value }) => (value != null ? parseInt(String(value), 10) : undefined))
+  @Transform(({ value }) => {
+    if (value == null || value === '') return undefined;
+    const parsed = Number(value);
+    if (Number.isNaN(parsed)) return undefined;
+    return Math.round(parsed);
+  })
   targetProtein?: number;
 
   @ApiProperty({
