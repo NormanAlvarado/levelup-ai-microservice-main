@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { OpenAiProvider } from '../external-apis/openai.provider';
 import { GeminiProvider } from '../external-apis/gemini.provider';
 import { SupabaseService } from '../supabase/supabase.service';
+import { RateLimitService } from '../shared/services/rate-limit.service';
 import { GenerateDietDto } from '../shared/dto/generate-diet.dto';
 import { DietPlan } from '../shared/types/diet.interface';
 import { ApiResponse, createSuccessResponse, createErrorResponse } from '../shared/utils/api-response';
@@ -16,12 +17,16 @@ export class DietService {
     private openAiProvider: OpenAiProvider,
     private geminiProvider: GeminiProvider,
     private supabaseService: SupabaseService,
+    private rateLimitService: RateLimitService,
   ) {}
 
   async generateDiet(dto: GenerateDietDto): Promise<ApiResponse<DietPlan>> {
     const startTime = Date.now();
     try {
       this.logger.log(`Generating diet plan for user: ${dto.userId}`);
+
+      // Check rate limits before generating
+      await this.rateLimitService.checkAndIncrementTokens(dto.userId, 'diet');
 
       // Get AI provider from config
       const provider = this.configService.get<string>('ai.defaultProvider') || 'gemini';
