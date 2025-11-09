@@ -124,4 +124,22 @@ export class WorkoutController {
   ): Promise<ApiResponse<WorkoutPlan>> {
     return await this.workoutService.generatePersonalizedWorkout(generateWorkoutDto);
   }
+
+  @Get('token-usage/:userId')
+  @ApiOperation({
+    summary: 'Get user token usage',
+    description: 'Retrieves the current token usage for a user',
+  })
+  @ApiParam({
+    name: 'userId',
+    description: 'User ID',
+    type: 'string',
+  })
+  @SwaggerApiResponse({
+    status: HttpStatus.OK,
+    description: 'Token usage retrieved successfully',
+  })
+  async getTokenUsage(@Param('userId') userId: string) {
+    return await this.workoutService.getTokenUsage(userId);
+  }
 }

@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { OpenAiProvider } from '../external-apis/openai.provider';
 import { GeminiProvider } from '../external-apis/gemini.provider';
 import { SupabaseService } from '../supabase/supabase.service';
+import { RateLimitService } from '../shared/services/rate-limit.service';
 import { GenerateWorkoutDto } from '../shared/dto/generate-workout.dto';
 import { WorkoutPlan } from '../shared/types/workout.interface';
 import { ApiResponse, createSuccessResponse, createErrorResponse } from '../shared/utils/api-response';
@@ -16,12 +17,16 @@ export class WorkoutService {
     private openAiProvider: OpenAiProvider,
     private geminiProvider: GeminiProvider,
     private supabaseService: SupabaseService,
+    private rateLimitService: RateLimitService,
   ) {}
 
   async generateWorkout(dto: GenerateWorkoutDto): Promise<ApiResponse<WorkoutPlan>> {
     const startTime = Date.now();
     try {
       this.logger.log(`Generating workout for user: ${dto.userId}`);
+
+      // Check rate limits before generating
+      await this.rateLimitService.checkAndIncrementTokens(dto.userId, 'workout');
 
       // Get AI provider from config
       const provider = this.configService.get<string>('ai.defaultProvider') || 'gemini';
@@ -221,6 +226,16 @@ export class WorkoutService {
       this.logger.warn(`Could not fetch user profile for ${userId}:`, error);
       // Return null if profile not found, so we can continue with basic generation
       return null;
+    }
+  }
+
+  async getTokenUsage(userId: string) {
+    try {
+      const usage = await this.rateLimitService.getUserTokenUsage(userId);
+      return createSuccessResponse(usage, 'Token usage retrieved successfully');
+    } catch (error) {
+      this.logger.error(`Failed to get token usage for user ${userId}:`, error);
+      return createErrorResponse('Failed to retrieve token usage');
     }
   }
 }

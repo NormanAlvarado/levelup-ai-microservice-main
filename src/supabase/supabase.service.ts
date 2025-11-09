@@ -479,48 +479,35 @@ export class SupabaseService {
         if (!insertedMeal?.id) continue;
 
         for (const item of meal.items) {
-          // 1. Buscar si el alimento ya existe en la tabla foods
-          const { data: existingFood } = await this.supabase
+          // Normalizar nombre del alimento
+          const normalizedName = item.name.trim();
+          const category = this.inferFoodCategory(normalizedName);
+          
+          // Usar upsert para evitar duplicados (on conflict do nothing)
+          const { data: food, error: foodError } = await this.supabase
             .from('foods')
+            .upsert([{
+              name: normalizedName,
+              category: category,
+              calories_per_100g: item.calories || 0,
+              protein_per_100g: item.protein || 0,
+              carbs_per_100g: item.carbs || 0,
+              fat_per_100g: item.fat || 0,
+              fiber_per_100g: item.fiber || 0,
+              is_common: true,
+            }], {
+              onConflict: 'name',
+              ignoreDuplicates: false, // Retornar el existente si ya existe
+            })
             .select('id')
-            .ilike('name', item.name)
-            .maybeSingle();
+            .single();
 
-          let foodId: string;
-
-          if (existingFood) {
-            // El alimento ya existe
-            foodId = existingFood.id;
-          } else {
-            // 2. Crear el alimento nuevo en la tabla foods
-            this.logger.log(`🆕 Creando nuevo alimento: ${item.name}`);
-            
-            // Inferir categoría basada en el nombre
-            const category = this.inferFoodCategory(item.name);
-            
-            const { data: newFood, error: foodError } = await this.supabase
-              .from('foods')
-              .insert([{
-                name: item.name,
-                category: category,
-                calories_per_100g: item.calories || 0,
-                protein_per_100g: item.protein || 0,
-                carbs_per_100g: item.carbs || 0,
-                fat_per_100g: item.fat || 0,
-                fiber_per_100g: item.fiber || 0,
-                is_common: true, // Marcado como común porque fue generado por IA
-              }])
-              .select('id')
-              .single();
-
-            if (foodError) {
-              this.logger.error(`❌ Error creating food '${item.name}':`, foodError);
-              continue;
-            }
-
-            foodId = newFood.id;
-            newFoodsCreated++;
+          if (foodError || !food) {
+            this.logger.error(`❌ Error upserting food '${normalizedName}':`, foodError);
+            continue;
           }
+
+          const foodId = food.id;
 
           // 3. Crear la relación en diet_meal_foods
           // Extraer cantidad en gramos del string quantity (ej: "100g" -> 100)
