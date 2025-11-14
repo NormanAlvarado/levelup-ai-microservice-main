@@ -46,6 +46,10 @@ export class WorkoutController {
     description: 'Invalid input data',
   })
   @SwaggerApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Rate limit exceeded',
+  })
+  @SwaggerApiResponse({
     status: HttpStatus.INTERNAL_SERVER_ERROR,
     description: 'Failed to generate workout plan',
   })
