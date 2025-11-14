@@ -36,7 +36,7 @@ export class DietService {
       let model = '';
       if (provider === 'gemini') {
         aiResponse = await this.geminiProvider.generateDietPlan(dto);
-        model = 'gemini-1.5-flash';
+        model = 'gemini-1.5-pro';
       } else {
         aiResponse = await this.openAiProvider.generateDietPlan(dto);
         model = 'gpt-4o-mini';
@@ -70,7 +70,7 @@ export class DietService {
         userId: dto.userId,
         requestType: 'diet',
         provider: provider as 'openai' | 'gemini' | 'anthropic',
-        model: provider === 'gemini' ? 'gemini-1.5-flash' : 'gpt-4o-mini',
+        model: provider === 'gemini' ? 'gemini-1.5-pro' : 'gpt-4o-mini',
         requestData: dto,
         responseData: null,
         success: false,
@@ -100,7 +100,7 @@ export class DietService {
       
       if (provider === 'gemini') {
         aiResponse = await this.geminiProvider.generateDietPlan(dto, userProfile);
-        model = 'gemini-1.5-flash';
+        model = 'gemini-1.5-pro';
       } else {
         aiResponse = await this.openAiProvider.generateDietPlan(dto);
         model = 'gpt-4o-mini';
