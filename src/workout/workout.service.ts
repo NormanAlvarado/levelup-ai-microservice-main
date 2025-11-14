@@ -36,7 +36,7 @@ export class WorkoutService {
       let model = '';
       if (provider === 'gemini') {
         aiResponse = await this.geminiProvider.generateWorkoutPlan(dto);
-        model = 'gemini-1.5-pro';
+        model = 'gemini-pro';
       } else {
         aiResponse = await this.openAiProvider.generateWorkoutPlan(dto);
         model = 'gpt-4o-mini';
@@ -70,7 +70,7 @@ export class WorkoutService {
         userId: dto.userId,
         requestType: 'workout',
         provider: provider as 'openai' | 'gemini' | 'anthropic',
-        model: provider === 'gemini' ? 'gemini-1.5-pro' : 'gpt-4o-mini',
+        model: provider === 'gemini' ? 'gemini-pro' : 'gpt-4o-mini',
         requestData: dto,
         responseData: null,
         success: false,
@@ -99,7 +99,7 @@ export class WorkoutService {
       let model = '';
       if (provider === 'gemini') {
         aiResponse = await this.geminiProvider.generateWorkoutPlan(dto, userProfile);
-        model = 'gemini-1.5-pro';
+        model = 'gemini-pro';
       } else {
         aiResponse = await this.openAiProvider.generateWorkoutPlan(dto);
         model = 'gpt-4o-mini';
@@ -133,7 +133,7 @@ export class WorkoutService {
         userId: dto.userId,
         requestType: 'workout',
         provider: provider as 'openai' | 'gemini' | 'anthropic',
-        model: provider === 'gemini' ? 'gemini-1.5-pro' : 'gpt-4o-mini',
+        model: provider === 'gemini' ? 'gemini-pro' : 'gpt-4o-mini',
         requestData: dto,
         responseData: null,
         success: false,
