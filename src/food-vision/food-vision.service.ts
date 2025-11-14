@@ -89,7 +89,7 @@ export class FoodVisionService {
 
     this.logger.log('Using Gemini Vision for analysis');
 
-    const model = this.gemini.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = this.gemini.getGenerativeModel({ model: 'gemini-1.5-pro' });
 
     const prompt = `Eres un experto nutricionista. Analiza esta imagen de comida y proporciona:
 
