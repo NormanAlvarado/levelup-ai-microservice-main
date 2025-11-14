@@ -12,6 +12,15 @@ export class SupabaseService {
   private readonly logger = new Logger(SupabaseService.name);
   private supabase: SupabaseClient;
 
+  // Mapeo de goals de inglés a español para la BD
+  private readonly goalMapping: Record<string, string> = {
+    'lose_weight': 'perder_peso',
+    'gain_muscle': 'ganar_musculo',
+    'maintain': 'mantener',
+    'improve_endurance': 'resistencia',
+    'general': 'general',
+  };
+
   constructor(private configService: ConfigService) {
     const supabaseUrl = this.configService.get<string>('supabase.url');
     const supabaseKey = this.configService.get<string>('supabase.serviceKey');
@@ -38,6 +47,13 @@ export class SupabaseService {
     workoutPlan: Partial<WorkoutPlan>,
   ): Promise<WorkoutPlan> {
     try {
+      // Mapear goal de inglés a español
+      const mappedGoal = workoutPlan.goal 
+        ? this.goalMapping[workoutPlan.goal] || workoutPlan.goal 
+        : null;
+
+      this.logger.log(`Mapping goal: ${workoutPlan.goal} -> ${mappedGoal}`);
+
       const { data, error } = await this.supabase
         .from('workout_routines')
         .insert([
@@ -46,7 +62,7 @@ export class SupabaseService {
             name: workoutPlan.name,
             description: workoutPlan.description,
             difficulty_level: workoutPlan.difficulty,
-            goal: workoutPlan.goal,
+            goal: mappedGoal,
             days_per_week: workoutPlan.daysPerWeek,
             generated_by_ai: true,
             is_active: true,
@@ -325,6 +341,13 @@ export class SupabaseService {
 
   async saveDietPlan(dietPlan: Partial<DietPlan>): Promise<DietPlan> {
     try {
+      // Mapear goal de inglés a español para diet plans
+      const mappedGoal = dietPlan.goal 
+        ? this.goalMapping[dietPlan.goal] || dietPlan.goal 
+        : null;
+
+      this.logger.log(`Mapping diet goal: ${dietPlan.goal} -> ${mappedGoal}`);
+
       // 1. Guardar el plan de dieta (sin meals)
       const { data: savedPlan, error: planError } = await this.supabase
         .from('diet_plans')
@@ -333,7 +356,7 @@ export class SupabaseService {
             user_id: dietPlan.userId,
             name: dietPlan.name,
             description: dietPlan.description,
-            goal: dietPlan.goal,
+            goal: mappedGoal,
             target_calories: dietPlan.totalCalories,
             target_protein_g: dietPlan.targetMacros?.protein || 0,
             target_carbs_g: dietPlan.targetMacros?.carbs || 0,

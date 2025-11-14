@@ -27,7 +27,7 @@ export class FoodVisionService {
   constructor(private configService: ConfigService) {
     const geminiKey = this.configService.get<string>('gemini.apiKey');
     const openaiKey = this.configService.get<string>('openai.apiKey');
-    this.defaultProvider = this.configService.get<string>('ai.defaultProvider') || 'gemini';
+    this.defaultProvider = this.configService.get<string>('ai.defaultProvider') || 'openai';
 
     if (geminiKey) {
       this.gemini = new GoogleGenerativeAI(geminiKey);
@@ -193,7 +193,7 @@ Responde SOLO en formato JSON sin markdown:
       }
 
       const response = await this.openai.chat.completions.create({
-        model: 'gpt-4-vision-preview',
+        model: 'gpt-4o',
         messages: [
           {
             role: 'user',

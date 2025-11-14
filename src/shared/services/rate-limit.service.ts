@@ -86,20 +86,24 @@ export class RateLimitService {
       usage = newUsage;
     }
 
-    // 3. Verificar límites
+    // 3. Verificar límites (salta validación si el plan es ilimitado con -1)
     const currentWorkoutTokens = usage.workout_tokens_used || 0;
     const currentDietTokens = usage.diet_tokens_used || 0;
 
-    if (type === 'workout' && currentWorkoutTokens >= limits.workout_tokens_per_month) {
+    const isWorkoutUnlimited = limits.workout_tokens_per_month === -1;
+    const isDietUnlimited = limits.diet_tokens_per_month === -1;
+
+    // Solo verificar límites si NO es ilimitado
+    if (type === 'workout' && !isWorkoutUnlimited && currentWorkoutTokens >= limits.workout_tokens_per_month) {
       throw new HttpException(
-        `Límite de generaciones de rutinas alcanzado (${limits.workout_tokens_per_month}/${limits.workout_tokens_per_month}). Mejora tu plan para generar más.`,
+        `Has alcanzado tu límite mensual de ${limits.workout_tokens_per_month} rutinas. Mejora tu plan a Premium para generar rutinas ilimitadas.`,
         HttpStatus.FORBIDDEN,
       );
     }
 
-    if (type === 'diet' && currentDietTokens >= limits.diet_tokens_per_month) {
+    if (type === 'diet' && !isDietUnlimited && currentDietTokens >= limits.diet_tokens_per_month) {
       throw new HttpException(
-        `Límite de generaciones de dietas alcanzado (${limits.diet_tokens_per_month}/${limits.diet_tokens_per_month}). Mejora tu plan para generar más.`,
+        `Has alcanzado tu límite mensual de ${limits.diet_tokens_per_month} planes de dieta. Mejora tu plan a Premium para generar planes ilimitados.`,
         HttpStatus.FORBIDDEN,
       );
     }
@@ -119,8 +123,12 @@ export class RateLimitService {
       throw new HttpException('Error al actualizar uso de tokens', HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
+    const newCount = type === 'workout' ? currentWorkoutTokens + 1 : currentDietTokens + 1;
+    const limit = type === 'workout' ? limits.workout_tokens_per_month : limits.diet_tokens_per_month;
+    const limitDisplay = limit === -1 ? 'ilimitado' : limit;
+
     this.logger.log(
-      `✅ Token ${type} incrementado para usuario ${userId}: ${type === 'workout' ? currentWorkoutTokens + 1 : currentDietTokens + 1}/${type === 'workout' ? limits.workout_tokens_per_month : limits.diet_tokens_per_month}`,
+      `✅ Token ${type} incrementado para usuario ${userId}: ${newCount}/${limitDisplay}`,
     );
   }
 
