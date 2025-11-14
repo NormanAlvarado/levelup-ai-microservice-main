@@ -9,12 +9,20 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import { IsString, IsOptional } from 'class-validator';
 import { FoodVisionService } from './food-vision.service';
 import { createSuccessResponse, createErrorResponse } from '../shared/utils/api-response';
 
 class AnalyzeFoodImageDto {
+  @IsString()
   imageBase64: string;
+
+  @IsString()
+  @IsOptional()
   mimeType?: string;
+
+  @IsString()
+  @IsOptional()
   mealType?: string;
 }
 
