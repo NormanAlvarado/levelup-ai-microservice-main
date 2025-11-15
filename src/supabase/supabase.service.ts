@@ -59,6 +59,19 @@ export class SupabaseService {
 
       this.logger.log(`Mapping goal: ${workoutPlan.goal} -> ${mappedGoal}`);
 
+      // 0. Desactivar rutinas anteriores para crear historial
+      this.logger.log(`🏋️ Desactivando rutinas anteriores del usuario ${workoutPlan.userId}`);
+      const { error: deactivateError } = await this.supabase
+        .from('workout_routines')
+        .update({ is_active: false })
+        .eq('user_id', workoutPlan.userId)
+        .eq('is_active', true);
+
+      if (deactivateError) {
+        this.logger.warn('Warning desactivating old routines:', deactivateError);
+        // No fallar, solo advertir
+      }
+
       const { data, error } = await this.supabase
         .from('workout_routines')
         .insert([
@@ -353,6 +366,19 @@ export class SupabaseService {
 
       this.logger.log(`Mapping diet goal: ${dietPlan.goal} -> ${mappedGoal}`);
 
+      // 0. Desactivar planes anteriores para crear historial
+      this.logger.log(`📋 Desactivando planes anteriores del usuario ${dietPlan.userId}`);
+      const { error: deactivateError } = await this.supabase
+        .from('diet_plans')
+        .update({ is_active: false })
+        .eq('user_id', dietPlan.userId)
+        .eq('is_active', true);
+
+      if (deactivateError) {
+        this.logger.warn('Warning desactivating old plans:', deactivateError);
+        // No fallar, solo advertir
+      }
+
       // 1. Guardar el plan de dieta (sin meals)
       const { data: savedPlan, error: planError } = await this.supabase
         .from('diet_plans')
@@ -379,7 +405,7 @@ export class SupabaseService {
       }
 
       // 2. Guardar las comidas asociadas al plan
-      // La IA ahora genera comidas para toda la semana (ej: 35 comidas = 5 comidas × 7 días)
+      // La IA puede generar comidas para toda la semana (ej: 28 comidas = 4 × 7 días) o solo para un día (4 comidas)
       if (dietPlan.meals && dietPlan.meals.length > 0) {
         this.logger.log(`📋 Procesando ${dietPlan.meals.length} comidas generadas por la IA`);
         
@@ -394,33 +420,60 @@ export class SupabaseService {
           order_in_day: number;
         }> = [];
         
-        // Determinar cuántas comidas por día (ej: 35 comidas / 7 días = 5 comidas/día)
-        const mealsPerDay = Math.ceil(dietPlan.meals.length / 7);
-        this.logger.log(`📊 Comidas por día: ${mealsPerDay}`);
+        // Detectar si la IA generó comidas para toda la semana o solo para un día
+        const totalMeals = dietPlan.meals.length;
+        const isWeeklyPlan = totalMeals >= 21; // Si hay 21+ comidas, asumimos plan semanal (3-5 comidas × 7 días)
         
-        // Distribuir las comidas por día
-        dietPlan.meals.forEach((meal, globalIndex) => {
-          // Calcular el día de la semana (1-7) y el orden dentro del día
-          const day_of_week = Math.floor(globalIndex / mealsPerDay) + 1;
-          const order_in_day = (globalIndex % mealsPerDay) + 1;
+        if (isWeeklyPlan) {
+          // La IA generó comidas para toda la semana
+          const mealsPerDay = Math.round(totalMeals / 7);
+          this.logger.log(`📊 Plan semanal detectado: ${mealsPerDay} comidas por día × 7 días`);
           
-          // Si el día excede 7, ajustar al último día
-          const finalDay = Math.min(day_of_week, 7);
+          // Distribuir las comidas directamente (ya vienen variadas por día)
+          for (let day = 1; day <= 7; day++) {
+            const startIndex = (day - 1) * mealsPerDay;
+            const endIndex = startIndex + mealsPerDay;
+            const dayMeals = dietPlan.meals.slice(startIndex, endIndex);
+            
+            dayMeals.forEach((meal, mealIndex) => {
+              mealsToInsert.push({
+                diet_plan_id: savedPlan.id,
+                meal_type: this.inferMealType(meal.name),
+                day_of_week: day,
+                name: meal.name,
+                description: meal.items
+                  ?.map((item) => `${item.name} (${item.quantity})`)
+                  .join(', '),
+                preparation_time_minutes: meal.prepTime || 30,
+                recipe_instructions:
+                  meal.instructions || 'Preparar según indicaciones',
+                order_in_day: mealIndex + 1,
+              });
+            });
+          }
+        } else {
+          // La IA generó comidas solo para un día - replicar para toda la semana
+          const mealsPerDay = totalMeals;
+          this.logger.log(`📊 Plan diario detectado: ${mealsPerDay} comidas - replicando para 7 días`);
           
-          mealsToInsert.push({
-            diet_plan_id: savedPlan.id,
-            meal_type: this.inferMealType(meal.name),
-            day_of_week: finalDay,
-            name: meal.name,
-            description: meal.items
-              ?.map((item) => `${item.name} (${item.quantity})`)
-              .join(', '),
-            preparation_time_minutes: meal.prepTime || 30,
-            recipe_instructions:
-              meal.instructions || 'Preparar según indicaciones',
-            order_in_day: order_in_day,
-          });
-        });
+          for (let day = 1; day <= 7; day++) {
+            dietPlan.meals.forEach((meal, mealIndex) => {
+              mealsToInsert.push({
+                diet_plan_id: savedPlan.id,
+                meal_type: this.inferMealType(meal.name),
+                day_of_week: day,
+                name: meal.name,
+                description: meal.items
+                  ?.map((item) => `${item.name} (${item.quantity})`)
+                  .join(', '),
+                preparation_time_minutes: meal.prepTime || 30,
+                recipe_instructions:
+                  meal.instructions || 'Preparar según indicaciones',
+                order_in_day: mealIndex + 1,
+              });
+            });
+          }
+        }
 
         this.logger.log(`📊 Total de comidas a insertar: ${mealsToInsert.length} distribuidas en 7 días`);
         
@@ -495,47 +548,65 @@ export class SupabaseService {
    */
   private async processMealFoods(meals: any[], insertedMeals: any[]): Promise<void> {
     try {
-      this.logger.log(`🍎 Procesando alimentos individuales de ${meals.length} comidas`);
+      this.logger.log(`🍎 Procesando alimentos individuales de ${insertedMeals.length} comidas insertadas`);
       let totalFoodsProcessed = 0;
       let newFoodsCreated = 0;
 
-      for (let i = 0; i < meals.length; i++) {
-        const meal = meals[i];
-        const insertedMeal = insertedMeals[i];
+      // Ahora insertedMeals tiene 28 comidas (4 comidas × 7 días)
+      // Necesitamos mapear cada comida insertada a su meal original basándonos en order_in_day
+      for (const insertedMeal of insertedMeals) {
+        if (!insertedMeal?.id || !insertedMeal?.order_in_day) continue;
+        
+        // Obtener la comida original basándonos en order_in_day (1-based index)
+        const mealIndex = insertedMeal.order_in_day - 1;
+        const meal = meals[mealIndex];
 
-        if (!meal.items || meal.items.length === 0) continue;
-        if (!insertedMeal?.id) continue;
+        if (!meal || !meal.items || meal.items.length === 0) continue;
 
         for (const item of meal.items) {
           // Normalizar nombre del alimento
           const normalizedName = item.name.trim();
           const category = this.inferFoodCategory(normalizedName);
           
-          // Usar upsert para evitar duplicados (on conflict do nothing)
-          const { data: food, error: foodError } = await this.supabase
+          // Buscar si el alimento ya existe
+          const { data: existingFood } = await this.supabase
             .from('foods')
-            .upsert([{
-              name: normalizedName,
-              category: category,
-              calories_per_100g: item.calories || 0,
-              protein_per_100g: item.protein || 0,
-              carbs_per_100g: item.carbs || 0,
-              fat_per_100g: item.fat || 0,
-              fiber_per_100g: item.fiber || 0,
-              is_common: true,
-            }], {
-              onConflict: 'name',
-              ignoreDuplicates: false, // Retornar el existente si ya existe
-            })
             .select('id')
+            .eq('name', normalizedName)
             .single();
 
-          if (foodError || !food) {
-            this.logger.error(`❌ Error upserting food '${normalizedName}':`, foodError);
-            continue;
-          }
+          let foodId: string;
 
-          const foodId = food.id;
+          if (existingFood) {
+            // Usar el alimento existente
+            foodId = existingFood.id;
+            this.logger.log(`♻️  Usando alimento existente: ${normalizedName}`);
+          } else {
+            // Crear nuevo alimento
+            const { data: newFood, error: foodError } = await this.supabase
+              .from('foods')
+              .insert([{
+                name: normalizedName,
+                category: category,
+                calories_per_100g: item.calories || 0,
+                protein_per_100g: item.protein || 0,
+                carbs_per_100g: item.carbs || 0,
+                fat_per_100g: item.fat || 0,
+                fiber_per_100g: item.fiber || 0,
+                is_common: true,
+              }])
+              .select('id')
+              .single();
+
+            if (foodError || !newFood) {
+              this.logger.error(`❌ Error creating food '${normalizedName}':`, foodError);
+              continue;
+            }
+
+            foodId = newFood.id;
+            newFoodsCreated++;
+            this.logger.log(`✅ Nuevo alimento creado: ${normalizedName}`);
+          }
 
           // 3. Crear la relación en diet_meal_foods
           // Extraer cantidad en gramos del string quantity (ej: "100g" -> 100)
