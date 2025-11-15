@@ -209,7 +209,7 @@ El plan debe incluir ejercicios variados, apropiados para el nivel y objetivo es
 
   private buildDietPrompt(dto: GenerateDietDto): string {
     return `
-Genera un plan nutricional personalizado con las siguientes especificaciones:
+Genera un plan nutricional personalizado VARIADO para UNA SEMANA COMPLETA con las siguientes especificaciones:
 - Objetivo: ${dto.goal}
 - Calorías diarias: ${dto.calories}
 - Comidas por día: ${dto.mealsPerDay || 4}
@@ -219,7 +219,15 @@ ${dto.preferredFoods ? `- Alimentos preferidos: ${dto.preferredFoods.join(', ')}
 ${dto.avoidFoods ? `- Alimentos a evitar: ${dto.avoidFoods.join(', ')}` : ''}
 ${dto.preferences ? `- Preferencias adicionales: ${dto.preferences}` : ''}
 
-El plan debe ser balanceado, nutritivo y cumplir con las restricciones especificadas.
+IMPORTANTE: 
+1. Genera ${dto.mealsPerDay || 4} comidas DIFERENTES por día
+2. Las comidas deben variar significativamente entre días (NO repitas las mismas comidas cada día)
+3. Crea variedad en proteínas (pollo, pescado, huevos, legumbres, etc.)
+4. Varía las verduras y carbohidratos en cada día
+5. El plan debe ser balanceado, nutritivo, económico y cumplir con las restricciones especificadas
+6. Asegúrate de que cada día tenga combinaciones diferentes de alimentos
+
+Genera SOLO ${dto.mealsPerDay || 4} comidas (que representan UN DÍA tipo balanceado).
     `.trim();
   }
 
