@@ -14,11 +14,16 @@ export class SupabaseService {
 
   // Mapeo de goals de inglés a español para la BD
   private readonly goalMapping: Record<string, string> = {
+    // Workout goals
     'lose_weight': 'perder_peso',
     'gain_muscle': 'ganar_musculo',
     'maintain': 'mantener',
     'improve_endurance': 'resistencia',
     'general': 'general',
+    // Diet goals
+    'maintain_weight': 'mantener',
+    'gain_weight': 'ganar_peso',
+    'improve_health': 'mejorar_salud',
   };
 
   constructor(private configService: ConfigService) {
